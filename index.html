@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#17172b">
+<meta name="description" content="Contadores personales con metas y avisos.">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Mi contador">
+<title>Mi contador</title>
+<style>
+:root{color-scheme:dark;--bg:#10101d;--card:#1d1d32;--accent:#8b7cff;--muted:#aaa9c4}
+*{box-sizing:border-box} body{margin:0;background:linear-gradient(160deg,#191934,#10101d 60%);color:#fff;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;padding:22px 15px 40px}
+header{max-width:650px;margin:0 auto 22px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+h1{font-size:26px;margin:0} .sub{color:var(--muted);font-size:13px;margin-top:5px}
+button,input{font:inherit} button{border:0;border-radius:13px;padding:12px 15px;font-weight:700;color:white;background:#383856;cursor:pointer;touch-action:manipulation}
+button:active{transform:scale(.97)} .primary{background:var(--accent);color:#fff}
+main{max-width:650px;margin:auto;display:grid;gap:14px}
+.counter{background:var(--card);border:1px solid #343450;border-radius:22px;padding:16px;box-shadow:0 10px 30px #0002}
+.top{display:flex;align-items:center;gap:12px}.emoji{width:48px;height:48px;border-radius:15px;background:#30304b;display:grid;place-items:center;font-size:27px;flex-shrink:0}
+.name{font-size:18px;font-weight:800;flex:1;min-width:0;overflow-wrap:anywhere}.count{font-size:52px;font-weight:850;text-align:center;line-height:1.2;margin:18px 0 10px;font-variant-numeric:tabular-nums}
+.goal{color:var(--muted);text-align:center;font-size:13px;margin-bottom:14px}.actions{display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px}.actions button{font-size:22px;padding:14px 8px}.actions .plus{background:#6255cf}.actions .minus{background:#41415d}.actions .reset{font-size:14px;background:#383849}
+.tools{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.tools button{font-size:12px;padding:9px 11px;color:#d9d8ed}
+.add{width:100%;padding:15px;font-size:16px}.empty{text-align:center;color:var(--muted);padding:35px 15px;background:var(--card);border-radius:18px}
+footer{max-width:650px;margin:18px auto;color:var(--muted);font-size:12px;text-align:center;line-height:1.5}
+input{width:100%;padding:12px;border-radius:12px;border:1px solid #454565;background:#131326;color:#fff;margin:6px 0 12px}
+label{font-size:13px;color:#d7d6e8}
+.dialog{position:fixed;inset:0;background:#000a;display:none;place-items:center;padding:20px;z-index:5}.dialog.show{display:grid}.panel{width:min(100%,400px);background:#22223a;border:1px solid #41415f;border-radius:20px;padding:20px}.panel h2{margin:0 0 16px}.panel .rowbtn{display:flex;gap:8px}.panel .rowbtn button{flex:1}
+</style>
+</head>
+<body>
+<header><div><h1>✨ Mi contador</h1><div class="sub">Tus contadores, a tu manera</div></div><button class="primary" id="addTop">＋ Nuevo</button></header>
+<main id="list"></main>
+<footer>Los números se guardan automáticamente en este dispositivo. La voz anuncia cuando alcanzas la meta; el funcionamiento de voz depende del navegador.</footer>
+<div class="dialog" id="dialog"><div class="panel">
+<h2 id="dialogTitle">Nuevo contador</h2>
+<label>Nombre</label><input id="nameInput" maxlength="35" placeholder="Ej. Cofres">
+<label>Meta (opcional)</label><input id="goalInput" type="number" min="1" max="999999" value="10">
+<label>Emoji</label><input id="emojiInput" maxlength="4" value="🎁">
+<div class="rowbtn"><button id="cancel">Cancelar</button><button class="primary" id="save">Guardar</button></div>
+</div></div>
+<script>
+const KEY='miContador_v1';
+let counters=[];
+try{counters=JSON.parse(localStorage.getItem(KEY)||'[]');if(!Array.isArray(counters))counters=[];}catch(e){counters=[];}
+let editing=null;
+const $=id=>document.getElementById(id);
+function persist(){try{localStorage.setItem(KEY,JSON.stringify(counters));}catch(e){}}
+function speak(text){if('speechSynthesis' in window){speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);u.lang='es-MX';speechSynthesis.speak(u);}}
+function safe(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function render(){
+ const list=$('list');
+ if(!counters.length){list.innerHTML='<div class="empty">Todavía no tienes contadores.<br>Presiona <b>＋ Nuevo</b> para crear el primero.</div>';return;}
+ list.innerHTML=counters.map(c=>`<section class="counter" data-id="${c.id}">
+ <div class="top"><div class="emoji">${safe(c.emoji||'🔢')}</div><div class="name">${safe(c.name)}</div><button data-action="edit" title="Editar">✎</button></div>
+ <div class="count">${c.value}</div><div class="goal">Meta: ${c.goal||10}</div>
+ <div class="actions"><button class="minus" data-action="minus" aria-label="Restar">−</button><button class="plus" data-action="plus" aria-label="Sumar">＋</button><button class="reset" data-action="reset">Reiniciar</button></div>
+ <div class="tools"><button data-action="rename">Cambiar nombre</button><button data-action="delete">Eliminar</button></div>
+ </section>`).join('');
+}
+function openDialog(c=null){
+ editing=c?c.id:null;$('dialogTitle').textContent=c?'Editar contador':'Nuevo contador';
+ $('nameInput').value=c?c.name:'';$('goalInput').value=c?c.goal:10;$('emojiInput').value=c?c.emoji:'🎁';$('dialog').classList.add('show');$('nameInput').focus();
+}
+function closeDialog(){$('dialog').classList.remove('show');}
+$('addTop').onclick=()=>openDialog();$('cancel').onclick=closeDialog;
+$('save').onclick=()=>{
+ const name=$('nameInput').value.trim();if(!name){$('nameInput').focus();return;}
+ const goal=Math.max(1,Math.min(999999,Number($('goalInput').value)||10));const emoji=$('emojiInput').value.trim()||'🔢';
+ if(editing!==null){const c=counters.find(x=>x.id===editing);if(c){c.name=name;c.goal=goal;c.emoji=emoji;c.goalReached=c.value>=goal;}}
+ else counters.push({id:Date.now()+Math.random(),name,goal,emoji,value:0,goalReached:false});
+ persist();render();closeDialog();
+};
+$('list').addEventListener('click',e=>{
+ const b=e.target.closest('button[data-action]');if(!b)return;
+ const section=b.closest('.counter');const c=counters.find(x=>String(x.id)===section.dataset.id);if(!c)return;
+ switch(b.dataset.action){
+ case 'plus':c.value++;if(c.value>=c.goal&&!c.goalReached){c.goalReached=true;speak('¡Felicidades! Has conseguido '+c.goal+' '+c.name);}break;
+ case 'minus':c.value=Math.max(0,c.value-1);if(c.value<c.goal)c.goalReached=false;break;
+ case 'reset':if(confirm('¿Reiniciar este contador?')){c.value=0;c.goalReached=false;}break;
+ case 'edit':case 'rename':openDialog(c);return;
+ case 'delete':if(confirm('¿Eliminar este contador?'))counters=counters.filter(x=>x.id!==c.id);break;
+ }
+ persist();render();
+});
+render();
+if ('serviceWorker' in navigator) { window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {})); }
+</script>
+</body>
+</html>
