@@ -1,26 +1,219 @@
-<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><meta name="theme-color" content="#17172b"><link rel="manifest" href="manifest.json"><title>Mi contador</title>
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#172554">
+<link rel="manifest" href="manifest.json">
+<title>Mis cofres</title>
 <style>
-*{box-sizing:border-box}body{margin:0;padding:20px 14px;background:#10101d;color:white;font-family:Arial,sans-serif}header,main,.voice{max-width:620px;margin:0 auto 15px}header{display:flex;justify-content:space-between;align-items:center}h1{font-size:25px}.card,.voice{background:#20203a;border:1px solid #393957;border-radius:18px;padding:15px;margin-bottom:12px}.voice button,.primary{background:#806ff0;color:white}.voice button,button{border:0;border-radius:12px;padding:12px;color:white;background:#41415e;font-weight:bold}button{cursor:pointer}.status,.hint{font-size:13px;color:#d0cfea;margin-top:9px}.name{font-size:19px;font-weight:bold}.num{text-align:center;font-size:48px;margin:15px}.actions{display:flex;gap:8px}.actions button{flex:1;font-size:22px}.plus{background:#6556cb}.small{font-size:12px;margin-top:10px}.goal{text-align:center;color:#bbb;margin-bottom:12px}input{width:100%;padding:12px;margin:5px 0 10px;border-radius:10px;border:1px solid #555;background:#15152a;color:white}
-</style></head><body>
-<header><h1>✨ Mi contador</h1><button class="primary" onclick="add()">＋ Nuevo</button></header>
-<section class="voice"><button id="voiceBtn" onclick="voice()">🎙️ Activar comando de voz</button><div class="status" id="status">Pulsa y di una instrucción.</div><div class="hint">Ejemplos: “sumar uno a cofres”, “restar dos a cofres”, “reiniciar cofres”.</div></section>
-<main id="list"></main>
+:root{--navy:#172554;--blue:#2563eb;--bg:#f3f6fc;--ink:#172033;--muted:#64748b}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{touch-action:manipulation}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;padding:env(safe-area-inset-top) 14px calc(22px + env(safe-area-inset-bottom));font-size:16px}
+header{background:linear-gradient(135deg,#172554,#2563eb);color:white;margin:0 -14px 16px;padding:22px 18px 20px;border-radius:0 0 24px 24px}
+h1{margin:0;font-size:27px} header p{margin:5px 0 0;color:#dbeafe}
+.panel{background:white;border-radius:18px;padding:16px;margin:13px 0;box-shadow:0 5px 18px #17255412}
+h2{font-size:19px;margin:0 0 12px}
+.row{display:flex;gap:9px;align-items:center;flex-wrap:wrap}
+input,button{font:inherit}
+input[type=text],input[type=number]{min-width:0;width:100%;padding:12px;border:1px solid #cbd5e1;border-radius:12px;background:white;color:var(--ink)}
+.field{flex:1;min-width:130px}
+button{border:0;border-radius:12px;padding:11px 14px;font-weight:700;cursor:pointer;touch-action:manipulation}
+.primary{background:var(--blue);color:white}.soft{background:#eaf1ff;color:#1d4ed8}.danger{background:#fee2e2;color:#b91c1c}
+.counter{border:1px solid #e2e8f0;border-radius:15px;padding:13px;margin-top:11px}
+.counter-head{display:flex;align-items:center;gap:9px}
+.counter-name{font-weight:800;font-size:17px;flex:1;overflow-wrap:anywhere}
+.number{font-size:32px;font-weight:800;text-align:center;padding:10px 0}
+.counter-actions{display:flex;gap:8px;flex-wrap:wrap}
+.counter-actions button{flex:1;min-width:75px}
+.status{min-width:92px}
+.status.yes{background:#dcfce7;color:#166534}.status.no{background:#fee2e2;color:#991b1b}
+.small{font-size:12px;color:var(--muted);margin-top:7px}
+.mic-status{font-weight:700;margin:10px 0 0}
+.mic-on{color:#15803d}.mic-off{color:#64748b}
+.summary-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.stat{background:#f1f5f9;border-radius:14px;padding:13px}
+.stat span{display:block;color:var(--muted);font-size:13px}.stat strong{display:block;font-size:27px;margin-top:4px}
+.stat.total{grid-column:1/-1;background:#dbeafe}
+.empty{color:var(--muted);text-align:center;padding:18px 5px}
+footer{text-align:center;color:var(--muted);font-size:12px;padding:12px}
+</style>
+</head>
+<body>
+<header><h1>🧰 Mis cofres</h1><p>Cuenta tus contenedores con botones o con tu voz.</p></header>
+
+<section class="panel">
+<h2>🎙️ Control por micrófono</h2>
+<div class="row">
+<button id="micBtn" class="primary">Activar micrófono</button>
+<span id="micLabel" class="mic-status mic-off">Micrófono apagado</span>
+</div>
+<p class="small">Cuando lo activas, seguirá escuchando mientras la página esté abierta. Para detenerlo, toca “Apagar micrófono”.</p>
+<p class="small">Ejemplos: “sumar uno a cofres”, “sumar cinco a madera”, “restar dos a cofres”, “marcar cofres como no”, “total general”.</p>
+<div id="heard" class="small" aria-live="polite"></div>
+</section>
+
+<section class="panel">
+<h2>➕ Agregar contenedor</h2>
+<div class="row">
+<div class="field"><input id="newName" type="text" placeholder="Nombre del contenedor"></div>
+<div class="field"><input id="newGoal" type="number" min="0" placeholder="Meta (opcional)"></div>
+<button id="addBtn" class="primary">Agregar</button>
+</div>
+</section>
+
+<section class="panel">
+<h2>📦 Mis contenedores</h2>
+<div id="counters"></div>
+</section>
+
+<section class="panel" id="summary">
+<h2>📊 Resumen de contenedores</h2>
+<div class="summary-grid">
+<div class="stat"><span>Resumen de SÍ</span><strong id="yesTotal">0</strong></div>
+<div class="stat"><span>Resumen de NO</span><strong id="noTotal">0</strong></div>
+<div class="stat total"><span>Total general</span><strong id="allTotal">0</strong></div>
+</div>
+<p class="small">Estos totales se calculan automáticamente. No cambian los números de tus contenedores.</p>
+</section>
+<footer>Mis cofres · Tus datos se guardan en este dispositivo.</footer>
+
 <script>
-const KEY='miContador_v1';let data=[];try{data=JSON.parse(localStorage.getItem(KEY)||'[]')}catch(e){data=[]}
-const $=x=>document.getElementById(x);
-function save(){localStorage.setItem(KEY,JSON.stringify(data))}
-function say(t){if('speechSynthesis'in window){let u=new SpeechSynthesisUtterance(t);u.lang='es-MX';speechSynthesis.speak(u)}}
-function draw(){$('list').innerHTML=data.length?data.map((c,i)=>`<section class="card"><div class="name">${c.emoji||'🎁'} ${esc(c.name)}</div><div class="num">${c.value}</div><div class="goal">Meta: ${c.goal}</div><div class="actions"><button onclick="change(${i},-1)">−</button><button class="plus" onclick="change(${i},1)">＋</button><button onclick="reset(${i})">Reiniciar</button></div><div class="small"><button onclick="edit(${i})">Editar</button> <button onclick="del(${i})">Eliminar</button></div></section>`).join(''):'<section class="card">Todavía no tienes contadores. Pulsa ＋ Nuevo.</section>'}
-function esc(s){return String(s).replace(/[&<>"]/g,x=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[x]))}
-function add(){let n=prompt('Nombre del contador:');if(!n)return;let g=Number(prompt('Meta:',10))||10;let e=prompt('Emoji:', '🎁')||'🎁';data.push({name:n,goal:g,emoji:e,value:0,goalReached:false});save();draw()}
-function edit(i){let n=prompt('Nombre:',data[i].name);if(n)data[i].name=n;let g=Number(prompt('Meta:',data[i].goal));if(g>0)data[i].goal=g;save();draw()}
-function del(i){if(confirm('¿Eliminar este contador?')){data.splice(i,1);save();draw()}}
-function reset(i){if(confirm('¿Reiniciar?')){data[i].value=0;data[i].goalReached=false;save();draw()}}
-function change(i,d){let c=data[i];c.value=Math.max(0,c.value+d);goal(c);save();draw()}
-function goal(c){if(c.value>=c.goal&&!c.goalReached){c.goalReached=true;say('¡Felicidades! Llegaste a la meta de '+c.name)}if(c.value<c.goal)c.goalReached=false}
-function num(s){let m={uno:1,una:1,dos:2,tres:3,cuatro:4,cinco:5,seis:6,siete:7,ocho:8,nueve:9,diez:10,cero:0};return m[s]??(parseInt(s)||1)}
-function command(raw){let t=raw.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();let m=t.match(/^(?:sumar|agregar|agrega)\s+(\w+)\s+a\s+(.+)$/);let a='sum';if(!m){m=t.match(/^(?:restar|quita|quitar)\s+(\w+)\s+a\s+(.+)$/);a='minus'}if(!m){m=t.match(/^(?:reiniciar|reinicia)\s+(.+)$/);a='reset'}if(!m){$('status').textContent='No entendí. Prueba “sumar uno a cofres”.';return}let amount=a==='reset'?0:num(m[1]);let target=(a==='reset'?m[1]:m[2]).replace(/^(el|la|los|las) /,'').trim();let c=data.find(x=>x.name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')===target);if(!c){$('status').textContent='No encontré el contador '+target+'.';return}if(a==='sum')c.value+=amount;else if(a==='minus')c.value=Math.max(0,c.value-amount);else{c.value=0;c.goalReached=false}goal(c);save();draw();$('status').textContent='Listo: '+c.name}
-function voice(){let SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR){$('status').textContent='Este navegador no admite comandos de voz. Usa Safari actualizado o los botones.';return}let r=new SR();r.lang='es-MX';r.continuous=false;r.interimResults=false;$('status').textContent='Escuchando… di tu comando.';$('voiceBtn').textContent='🔴 Escuchando…';r.onresult=e=>command(e.results[0][0].transcript);r.onerror=e=>$('status').textContent='No se pudo usar el micrófono. Revisa el permiso y vuelve a intentar.';r.onend=()=> $('voiceBtn').textContent='🎙️ Activar comando de voz';try{r.start()}catch(e){$('status').textContent='No pude iniciar el micrófono.'}}
-draw();
-if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});
-</script></body></html>
+const STORAGE_KEY = 'miContador_v1';
+let counters = [];
+try { counters = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); } catch(e) { counters = []; }
+if (!Array.isArray(counters)) counters = [];
+counters = counters.map((c,i)=>({
+  id: c.id ?? (Date.now()+i),
+  name: c.name || ('Contenedor '+(i+1)),
+  goal: Number(c.goal)||0,
+  emoji: c.emoji || '🧰',
+  value: Math.max(0, Number(c.value)||0),
+  goalReached: !!c.goalReached,
+  status: c.status === 'no' || c.status === false ? 'no' : 'yes'
+}));
+function save(){localStorage.setItem(STORAGE_KEY,JSON.stringify(counters));}
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function render(){
+ const host=document.getElementById('counters');
+ if(!counters.length){host.innerHTML='<div class="empty">Todavía no tienes contenedores. Agrega uno arriba.</div>';}
+ else host.innerHTML=counters.map(c=>`<article class="counter" data-id="${c.id}">
+  <div class="counter-head"><span style="font-size:24px">${escapeHtml(c.emoji)}</span><span class="counter-name">${escapeHtml(c.name)}</span>
+  <button class="status ${c.status==='yes'?'yes':'no'}" data-action="status">${c.status==='yes'?'➡️ SÍ':'➡️ NO'}</button></div>
+  <div class="number">${c.value}</div>
+  ${c.goal>0?`<div class="small">Meta: ${c.goal} ${c.value>=c.goal?'· ¡Meta alcanzada!':''}</div>`:''}
+  <div class="counter-actions">
+   <button class="soft" data-action="minus">− 1</button><button class="primary" data-action="plus">+ 1</button>
+   <button class="soft" data-action="edit">Editar</button><button class="danger" data-action="reset">Reiniciar</button>
+  </div>
+ </article>`).join('');
+ const yes=counters.filter(c=>c.status==='yes').reduce((s,c)=>s+c.value,0);
+ const no=counters.filter(c=>c.status==='no').reduce((s,c)=>s+c.value,0);
+ document.getElementById('yesTotal').textContent=yes;
+ document.getElementById('noTotal').textContent=no;
+ document.getElementById('allTotal').textContent=yes+no;
+ save();
+}
+function addCounter(name,goal=0){
+ name=(name||'').trim(); if(!name)return false;
+ counters.push({id:Date.now()+Math.floor(Math.random()*1000),name,goal:Number(goal)||0,emoji:'🧰',value:0,goalReached:false,status:'yes'});
+ render();return true;
+}
+document.getElementById('addBtn').addEventListener('click',()=>{
+ const n=document.getElementById('newName'),g=document.getElementById('newGoal');
+ if(addCounter(n.value,g.value)){n.value='';g.value='';n.focus();}
+});
+document.getElementById('newName').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('addBtn').click();});
+document.getElementById('counters').addEventListener('click',e=>{
+ const btn=e.target.closest('button[data-action]'); if(!btn)return;
+ const card=btn.closest('.counter'); const c=counters.find(x=>String(x.id)===card.dataset.id); if(!c)return;
+ const a=btn.dataset.action;
+ if(a==='plus')c.value++;
+ if(a==='minus')c.value=Math.max(0,c.value-1);
+ if(a==='reset'){if(confirm('¿Reiniciar '+c.name+'?'))c.value=0;}
+ if(a==='status')c.status=c.status==='yes'?'no':'yes';
+ if(a==='edit'){
+   const name=prompt('Nombre del contenedor:',c.name); if(name===null)return;
+   const goal=prompt('Meta (deja vacío si no tiene):',c.goal||''); if(goal===null)return;
+   c.name=name.trim()||c.name;c.goal=Math.max(0,Number(goal)||0);
+ }
+ render();
+});
+
+function normalize(s){return s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[¿?¡!,.;:]/g,' ').replace(/\s+/g,' ').trim();}
+function numberFromWords(s){
+ const map={cero:0,un:1,uno:1,una:1,dos:2,tres:3,cuatro:4,cinco:5,seis:6,siete:7,ocho:8,nueve:9,diez:10,once:11,doce:12,trece:13,catorce:14,quince:15,veinte:20,treinta:30,cincuenta:50,cien:100};
+ const m=s.match(/\b(\d+|cero|un|uno|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|once|doce|trece|catorce|quince|veinte|treinta|cincuenta|cien)\b/);
+ return m?( /^\d+$/.test(m[1])?Number(m[1]):map[m[1]] ):1;
+}
+function speak(msg){if('speechSynthesis'in window){speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(msg);u.lang='es-MX';speechSynthesis.speak(u);}}
+function sayTotals(which='all'){
+ const y=counters.filter(c=>c.status==='yes').reduce((s,c)=>s+c.value,0);
+ const n=counters.filter(c=>c.status==='no').reduce((s,c)=>s+c.value,0);
+ if(which==='yes')speak('El resumen de sí es '+y);
+ else if(which==='no')speak('El resumen de no es '+n);
+ else speak('El total general es '+(y+n)+'. El resumen de sí es '+y+'. El resumen de no es '+n+'.');
+}
+function processVoice(raw){
+ const t=normalize(raw); if(!t)return;
+ document.getElementById('heard').textContent='Escuché: “'+raw+'”';
+ if(t.includes('total')||t.includes('cuantos')){
+   if(t.includes(' de los si')||t.includes('total de si')||t.includes('cuantos si')){sayTotals('yes');return;}
+   if(t.includes(' de los no')||t.includes('total de no')||t.includes('cuantos no')){sayTotals('no');return;}
+   sayTotals('all');return;
+ }
+ const statusMatch=t.match(/marcar (.+?) como (si|no)/);
+ if(statusMatch){
+   const target=statusMatch[1].replace(/^(el|la|los|las)\s+/,'');
+   const c=counters.find(x=>normalize(x.name)===target||normalize(x.name).includes(target)||target.includes(normalize(x.name)));
+   if(c){c.status=statusMatch[2]==='si'?'yes':'no';render();speak(c.name+' marcado como '+statusMatch[2]);}
+   else speak('No encontré ese contenedor');return;
+ }
+ const isReset=/\b(reiniciar|reinicia|resetear|borrar)\b/.test(t);
+ const isMinus=/\b(restar|resta|quitar|quita)\b/.test(t);
+ const isPlus=/\b(sumar|suma|agregar|agrega|anadir|añadir)\b/.test(t);
+ if(!isReset&&!isMinus&&!isPlus)return;
+ const amount=isReset?0:numberFromWords(t);
+ let target=t.replace(/\b(sumar|suma|agregar|agrega|anadir|añadir|restar|resta|quitar|quita|reiniciar|reinicia|resetear|borrar|uno|un|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|once|doce|trece|catorce|quince|veinte|treinta|cincuenta|cien|\d+|a|al|de|del|por|favor|el|la|los|las)\b/g,' ').trim();
+ target=target.replace(/^(a|al|de|del)\s+/,'').trim();
+ let c=counters.find(x=>normalize(x.name)===target);
+ if(!c && target)c=counters.find(x=>normalize(x.name).includes(target)||target.includes(normalize(x.name)));
+ if(!c && counters.length===1)c=counters[0];
+ if(!c){speak('No identifiqué el contenedor. Di el nombre otra vez.');return;}
+ if(isReset)c.value=0; else if(isMinus)c.value=Math.max(0,c.value-amount); else c.value+=amount;
+ render();speak(isReset?'Reinicié '+c.name:(isMinus?'Resté ':'Sumé ')+amount+' a '+c.name+'. Ahora tiene '+c.value);
+}
+
+const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
+let recognition=null, micWanted=false, restarting=false;
+const micBtn=document.getElementById('micBtn'),micLabel=document.getElementById('micLabel');
+function updateMicUI(on,msg){
+ micLabel.textContent=msg|| (on?'Micrófono activo':'Micrófono apagado');
+ micLabel.className='mic-status '+(on?'mic-on':'mic-off');
+ micBtn.textContent=on?'Apagar micrófono':'Activar micrófono';
+ micBtn.className=on?'danger':'primary';
+}
+function startRecognition(){
+ if(!micWanted||!recognition||restarting)return;
+ try{restarting=true;recognition.start();}catch(e){restarting=false;}
+}
+function setupMic(){
+ if(!SpeechRecognition){updateMicUI(false,'Este navegador no permite dictado por voz.');micBtn.disabled=true;return;}
+ recognition=new SpeechRecognition();
+ recognition.lang='es-MX';recognition.continuous=true;recognition.interimResults=false;recognition.maxAlternatives=1;
+ recognition.onstart=()=>{restarting=false;updateMicUI(true,'Micrófono activo · escuchando');};
+ recognition.onresult=e=>{for(let i=e.resultIndex;i<e.results.length;i++){if(e.results[i].isFinal)processVoice(e.results[i][0].transcript);}};
+ recognition.onerror=e=>{restarting=false;if(e.error==='not-allowed'||e.error==='service-not-allowed'){micWanted=false;updateMicUI(false,'Permiso de micrófono denegado');}else updateMicUI(micWanted,'Reconectando micrófono…');};
+ recognition.onend=()=>{restarting=false;if(micWanted){updateMicUI(true,'Micrófono activo · reconectando');setTimeout(()=>{if(micWanted)startRecognition();},650);}else updateMicUI(false);};
+}
+micBtn.addEventListener('click',()=>{
+ if(!SpeechRecognition){setupMic();return;}
+ if(micWanted){micWanted=false;try{recognition.stop();}catch(e){}updateMicUI(false);speak('Micrófono apagado');}
+ else{if(!recognition)setupMic();micWanted=true;startRecognition();speak('Micrófono activado');}
+});
+render();
+if('serviceWorker'in navigator && location.protocol.startsWith('http'))window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
+</script>
+</body>
+</html>

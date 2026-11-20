@@ -1,9 +1,9 @@
 {
-  "name": "Mi contador",
-  "short_name": "Contador",
+  "name": "Mis cofres",
+  "short_name": "Mis cofres",
   "start_url": "./",
-  "scope": "./",
   "display": "standalone",
-  "background_color": "#10101d",
-  "theme_color": "#17172b"
+  "background_color": "#f3f6fc",
+  "theme_color": "#172554",
+  "icons": [{"src":"icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any"}]
 }
